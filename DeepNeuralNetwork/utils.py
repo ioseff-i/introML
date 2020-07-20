@@ -276,6 +276,30 @@ def compute_cost(AL, Y):
     
     return cost
 
+def cost_with_reg(AL, Y,parameters,lamb):
+    
+    
+    m = Y.shape[1]
+    
+    summation = 0
+    
+    L = len(parameters) // 2
+    
+    for i in range(1,L+1):
+        summation+=np.sum(np.square(parameters['W'+str(i)]))
+    L2_reg = 1/(2*m)*lamb*summation
+
+    # Compute loss from aL and y.
+    cost = (1./m) * (-np.dot(Y,np.log(AL).T) - np.dot(1-Y, np.log(1-AL).T))
+    
+    cost+=L2_reg
+    cost = np.squeeze(cost)      # To make sure your cost's shape is what we expect (e.g. this turns [[17]] into 17).
+    assert(cost.shape == ())
+    
+    return cost
+
+
+
 def linear_backward(dZ, cache):
     """
     Implement the linear portion of backward propagation for a single layer (layer l)
@@ -366,6 +390,77 @@ def L_model_backward(AL, Y, caches):
         grads["db" + str(l + 1)] = db_temp
 
     return grads
+
+
+
+
+
+
+
+
+
+def back_with_reg(AL, Y, caches,lamb,parameters):
+    """
+    Implement the backward propagation for the [LINEAR->RELU] * (L-1) -> LINEAR -> SIGMOID group
+    
+    Arguments:
+    AL -- probability vector, output of the forward propagation (L_model_forward())
+    Y -- true "label" vector (containing 0 if non-cat, 1 if cat)
+    caches -- list of caches containing:
+                every cache of linear_activation_forward() with "relu" (there are (L-1) or them, indexes from 0 to L-2)
+                the cache of linear_activation_forward() with "sigmoid" (there is one, index L-1)
+    
+    Returns:
+    grads -- A dictionary with the gradients
+             grads["dA" + str(l)] = ... 
+             grads["dW" + str(l)] = ...
+             grads["db" + str(l)] = ... 
+    """
+    grads = {}
+    L = len(caches) # the number of layers
+    m = AL.shape[1]
+    Y = Y.reshape(AL.shape) # after this line, Y is the same shape as AL
+    
+    # Initializing the backpropagation
+    dAL = - (np.divide(Y, AL) - np.divide(1 - Y, 1 - AL))
+    
+    # Lth layer (SIGMOID -> LINEAR) gradients. Inputs: "AL, Y, caches". Outputs: "grads["dAL"], grads["dWL"], grads["dbL"]
+    current_cache = caches[L-1]
+    grads["dA" + str(L-1)], grads["dW" + str(L)], grads["db" + str(L)] = linear_activation_backward(dAL, current_cache, activation = "sigmoid")
+    
+    for l in reversed(range(L-1)):
+        # lth layer: (RELU -> LINEAR) gradients.
+        current_cache = caches[l]
+        dA_prev_temp, dW_temp, db_temp = linear_activation_backward(grads["dA" + str(l + 1)], current_cache, activation = "relu")
+        grads["dA" + str(l)] = dA_prev_temp 
+        grads["dW" + str(l + 1)] = dW_temp + (lamb*parameters['W'+str(l+1)])/m
+        grads["db" + str(l + 1)] = db_temp
+
+    return grads
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 def update_parameters(parameters, grads, learning_rate):
     """
